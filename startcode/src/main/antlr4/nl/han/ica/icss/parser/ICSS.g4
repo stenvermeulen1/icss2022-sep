@@ -45,5 +45,9 @@ ASSIGNMENT_OPERATOR: ':=';
 
 
 //--- PARSER: ---
-stylesheet: EOF;
+stylesheet: stylerule*;
+stylerule: (ID_IDENT | CLASS_IDENT | LOWER_IDENT | CAPITAL_IDENT) + OPEN_BRACE + styledeclaration* CLOSE_BRACE;
+styledeclaration: property + COLON + value + SEMICOLON;
+property: LOWER_IDENT;
+value: TRUE | FALSE | PIXELSIZE | PERCENTAGE | SCALAR | COLOR;
 
