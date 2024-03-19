@@ -34,11 +34,14 @@ WS: [ \t\r\n]+ -> skip;
 //
 OPEN_BRACE: '{';
 CLOSE_BRACE: '}';
+OPEN_PAREN: '(';
+CLOSE_PAREN: ')';
 SEMICOLON: ';';
 COLON: ':';
 PLUS: '+';
 MIN: '-';
 MUL: '*';
+DIV: '/';
 ASSIGNMENT_OPERATOR: ':=';
 
 
@@ -46,10 +49,17 @@ ASSIGNMENT_OPERATOR: ':=';
 
 //--- PARSER: ---
 stylesheet: variable* stylerule*;
-stylerule: (ID_IDENT | CLASS_IDENT | LOWER_IDENT) + OPEN_BRACE + style_declaration* CLOSE_BRACE;
-style_declaration: property + COLON + (value | CAPITAL_IDENT) + SEMICOLON;
+stylerule: selector + OPEN_BRACE + (styleDeclaration | ifStatement)* CLOSE_BRACE;
+selector: ID_IDENT | CLASS_IDENT | LOWER_IDENT;
+styleDeclaration: property + COLON + (value | variableID | expression) + SEMICOLON;
 property: LOWER_IDENT;
-value: TRUE | FALSE | PIXELSIZE | PERCENTAGE | SCALAR | COLOR;
+value: PERCENTAGE | SCALAR | PIXELSIZE #pixelLiteral | COLOR #colorLiteral |TRUE | FALSE;
 
-variable: CAPITAL_IDENT + ASSIGNMENT_OPERATOR + value + SEMICOLON;
+variable: variableID + ASSIGNMENT_OPERATOR + value + SEMICOLON;
+variableID: CAPITAL_IDENT;
 
+expression: term ((PLUS | MIN) term)*;
+term: factor ((MUL | DIV) factor)*;
+factor: (variableID | value) | (OPEN_PAREN + expression + CLOSE_PAREN);
+
+ifStatement: IF + BOX_BRACKET_OPEN + CAPITAL_IDENT + BOX_BRACKET_CLOSE + OPEN_BRACE + styleDeclaration* ifStatement* CLOSE_BRACE (ELSE + OPEN_BRACE + (styleDeclaration | ifStatement)* CLOSE_BRACE)?;
