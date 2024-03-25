@@ -48,18 +48,28 @@ ASSIGNMENT_OPERATOR: ':=';
 
 
 //--- PARSER: ---
-stylesheet: variable* stylerule*;
-stylerule: selector + OPEN_BRACE + (styleDeclaration | ifStatement)* CLOSE_BRACE;
-selector: ID_IDENT | CLASS_IDENT | LOWER_IDENT;
-styleDeclaration: property + COLON + (value | variableID | expression) + SEMICOLON;
+stylesheet: variable* stylerule* EOF;
+stylerule: selector OPEN_BRACE styleruleBody* CLOSE_BRACE;
+styleruleBody: (styleDeclaration | ifStatement | variable);
+styleDeclaration: property COLON (variableID | literal | expression) SEMICOLON;
 property: LOWER_IDENT;
-value: PERCENTAGE | SCALAR | PIXELSIZE #pixelLiteral | COLOR #colorLiteral |TRUE | FALSE;
 
-variable: variableID + ASSIGNMENT_OPERATOR + value + SEMICOLON;
+//--- SELECTORS ---
+selector: classSelector | idSelector | tagSelector;
+classSelector: CLASS_IDENT;
+idSelector: ID_IDENT;
+tagSelector: LOWER_IDENT;
+
+//--- LITERALS ---
+literal: PERCENTAGE #percentageLiteral | SCALAR #scalarLiteral | PIXELSIZE #pixelLiteral | COLOR #colorLiteral | (TRUE | FALSE) #boolLiteral;
+
+//--- VARIABLES ---
+variable: variableID ASSIGNMENT_OPERATOR literal SEMICOLON;
 variableID: CAPITAL_IDENT;
 
-expression: term ((PLUS | MIN) term)*;
-term: factor ((MUL | DIV) factor)*;
-factor: (variableID | value) | (OPEN_PAREN + expression + CLOSE_PAREN);
+//--- MATHS ---
+expression: (literal | variableID) | expression (MUL | DIV) expression | expression (PLUS | MIN) expression;
 
-ifStatement: IF + BOX_BRACKET_OPEN + CAPITAL_IDENT + BOX_BRACKET_CLOSE + OPEN_BRACE + styleDeclaration* ifStatement* CLOSE_BRACE (ELSE + OPEN_BRACE + (styleDeclaration | ifStatement)* CLOSE_BRACE)?;
+//--- (ELSE-)IF-STATEMENT ---
+ifStatement: IF BOX_BRACKET_OPEN (variableID | (TRUE | FALSE)) BOX_BRACKET_CLOSE OPEN_BRACE styleruleBody* CLOSE_BRACE elseStatement?;
+elseStatement: ELSE OPEN_BRACE styleruleBody* CLOSE_BRACE;
