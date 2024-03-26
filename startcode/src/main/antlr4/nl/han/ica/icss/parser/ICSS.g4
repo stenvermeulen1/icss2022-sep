@@ -64,7 +64,7 @@ tagSelector: LOWER_IDENT;
 literal: PERCENTAGE #percentageLiteral | SCALAR #scalarLiteral | PIXELSIZE #pixelLiteral | COLOR #colorLiteral | (TRUE | FALSE) #boolLiteral;
 
 //--- VARIABLES ---
-variable: variableID ASSIGNMENT_OPERATOR literal SEMICOLON;
+variable: variableID ASSIGNMENT_OPERATOR expression SEMICOLON;
 variableID: CAPITAL_IDENT;
 
 //--- MATHS ---
