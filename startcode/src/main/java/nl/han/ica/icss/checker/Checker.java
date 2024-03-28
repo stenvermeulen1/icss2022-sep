@@ -77,11 +77,57 @@ public class Checker {
             return checkOperation((Operation) expression);
         }
         else {
-            return getExpressionType(expression);
+            return checkExpressionType(expression);
         }
     }
 
-    private ExpressionType getExpressionType(Expression expression) {
+    private void checkVariableAssignment(VariableAssignment variableAssignment) {
+        if (variableAssignment.expression instanceof PercentageLiteral) {
+            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.PERCENTAGE);
+        } else if (variableAssignment.expression instanceof ScalarLiteral) {
+            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.SCALAR);
+        } else if (variableAssignment.expression instanceof PixelLiteral) {
+            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.PIXEL);
+        } else if (variableAssignment.expression instanceof ColorLiteral) {
+            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.COLOR);
+        } else if (variableAssignment.expression instanceof BoolLiteral) {
+            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.BOOL);
+        } else if (variableAssignment.expression instanceof VariableReference) {
+            VariableReference variableReference = (VariableReference) variableAssignment.expression;
+            String varName = variableReference.name;
+            if (!variableTypes.getFirst().containsKey(varName)) {
+                variableAssignment.setError("The variable '" + varName + "' doesn't exist!");
+            } else {
+                variableTypes.getFirst().put(variableAssignment.name.name, variableTypes.getFirst().get(varName));
+            }
+        } else if (variableAssignment.expression instanceof Operation) {
+            ExpressionType type = checkOperation((Operation) variableAssignment.expression);
+            variableTypes.getFirst().put(variableAssignment.name.name, type);
+        }
+    }
+
+    private ExpressionType checkOperation(Operation operation) {
+        ExpressionType left = operation.lhs instanceof Operation ? checkOperation((Operation) operation.lhs) : checkExpressionType(operation.lhs);
+        ExpressionType right = operation.rhs instanceof Operation ? checkOperation((Operation) operation.rhs) : checkExpressionType(operation.rhs);
+
+        if (left == ExpressionType.COLOR || right == ExpressionType.COLOR || left == ExpressionType.BOOL || right == ExpressionType.BOOL) {
+            operation.setError("Booleans and colors are not allowed in an operation.");
+            return ExpressionType.UNDEFINED;
+        }
+        if (operation instanceof MultiplyOperation) {
+            if (left != ExpressionType.SCALAR && right != ExpressionType.SCALAR) {
+                operation.setError("Multiplication can only be performed with at least one scalar value.");
+                return ExpressionType.UNDEFINED;
+            }
+            return right != ExpressionType.SCALAR ? right : left;
+        } else if ((operation instanceof SubtractOperation || operation instanceof AddOperation) && left != right) {
+            operation.setError("Add and subtract operations can only be performed with the same type of literal.");
+            return ExpressionType.UNDEFINED;
+        }
+        return left;
+    }
+
+    private ExpressionType checkExpressionType(Expression expression) {
         if (expression instanceof VariableReference) {
             return checkVariableReference((VariableReference) expression);
         } else if (expression instanceof PercentageLiteral) {
@@ -98,57 +144,6 @@ public class Checker {
         return ExpressionType.UNDEFINED;
     }
 
-    private void checkVariableAssignment(VariableAssignment variableAssignment) {
-        if (variableAssignment.expression instanceof PercentageLiteral) {
-            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.PERCENTAGE);
-        } else if (variableAssignment.expression instanceof ScalarLiteral){
-            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.SCALAR);
-        } else if (variableAssignment.expression instanceof PixelLiteral){
-            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.PIXEL);
-        } else if (variableAssignment.expression instanceof ColorLiteral){
-            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.COLOR);
-        } else if (variableAssignment.expression instanceof BoolLiteral){
-            variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.BOOL);
-        } else if (variableAssignment.expression instanceof VariableReference){
-            if (!variableTypes.getFirst().containsKey(((VariableReference) variableAssignment.expression).name)){
-                variableAssignment.setError("The variable '" + ((VariableReference) variableAssignment.expression).name + "' doesn't exist!");
-            } else {
-                variableTypes.getFirst().put(variableAssignment.name.name, variableTypes.getFirst().get(((VariableReference) variableAssignment.expression).name));
-            }
-        } else if (variableAssignment.expression instanceof Operation){
-            ExpressionType type = checkOperation((Operation) variableAssignment.expression);
-            variableTypes.getFirst().put(variableAssignment.name.name, type);
-        }
-
-    }
-
-    private ExpressionType checkOperation(Operation operation) {
-        ExpressionType left = operation.lhs instanceof Operation ? checkOperation((Operation) operation.lhs) : checkExpressionType(operation.lhs);
-        ExpressionType right = operation.rhs instanceof Operation ? checkOperation((Operation) operation.rhs) : checkExpressionType(operation.rhs);
-
-        if (left == ExpressionType.COLOR || right == ExpressionType.COLOR || left == ExpressionType.BOOL || right == ExpressionType.BOOL) {
-            operation.setError("Booleans and colors are not allowed in an operation.");
-            return ExpressionType.UNDEFINED;
-        }
-
-        if (operation instanceof MultiplyOperation) {
-            if (left != ExpressionType.SCALAR && right != ExpressionType.SCALAR) {
-                operation.setError("Multiplication can only be performed with at least one scalar value.");
-                return ExpressionType.UNDEFINED;
-            }
-            return right != ExpressionType.SCALAR ? right : left;
-        } else if ((operation instanceof SubtractOperation || operation instanceof AddOperation) && left != right) {
-            operation.setError("Add and subtract operations can only be performed with the same type of literal.");
-            return ExpressionType.UNDEFINED;
-        }
-
-        return left;
-    }
-
-    private ExpressionType checkExpressionType(Expression expression) {
-        return getExpressionType(expression);
-    }
-
     private void checkIfClause(IfClause ifClause) {
         variableTypes.addFirst(new HashMap<>());
 
@@ -160,7 +155,6 @@ public class Checker {
         }
 
         checkRuleBody(ifClause.body);
-
         variableTypes.removeFirst();
 
         if (ifClause.getElseClause() != null) {
@@ -186,6 +180,7 @@ public class Checker {
 
     private ExpressionType checkVariableReference(VariableReference variableReference) {
         ExpressionType expressionType = getVariableType(variableReference.name);
+
         if (expressionType == null) {
             variableReference.setError("Variable '" + variableReference.name + "' doesn't exist!");
             return ExpressionType.UNDEFINED;
@@ -193,15 +188,13 @@ public class Checker {
         return expressionType;
     }
 
-    private ExpressionType getVariableType(String name) {
+    private ExpressionType getVariableType(String variableType) {
         for (HashMap<String, ExpressionType> scope : variableTypes) {
-            ExpressionType type = scope.get(name);
-            if (type != null) {
-                return type;
+            ExpressionType expressionType = scope.get(variableType);
+            if (expressionType != null) {
+                return expressionType;
             }
         }
         return null;
     }
-
-
 }
