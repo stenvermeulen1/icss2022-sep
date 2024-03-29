@@ -24,6 +24,7 @@ public class Checker {
 
     private void checkStylesheet(Stylesheet sheet) {
         variableTypes.addFirst(new HashMap<>());
+
         for (ASTNode child : sheet.getChildren()) {
             if (child instanceof VariableAssignment) {
                 checkVariableAssignment((VariableAssignment) child);
@@ -92,17 +93,16 @@ public class Checker {
             variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.COLOR);
         } else if (variableAssignment.expression instanceof BoolLiteral) {
             variableTypes.getFirst().put(variableAssignment.name.name, ExpressionType.BOOL);
+        } else if (variableAssignment.expression instanceof Operation) {
+            ExpressionType type = checkOperation((Operation) variableAssignment.expression);
+            variableTypes.getFirst().put(variableAssignment.name.name, type);
         } else if (variableAssignment.expression instanceof VariableReference) {
-            VariableReference variableReference = (VariableReference) variableAssignment.expression;
-            String varName = variableReference.name;
+            String varName = ((VariableReference) variableAssignment.expression).name;
             if (!variableTypes.getFirst().containsKey(varName)) {
                 variableAssignment.setError("The variable '" + varName + "' doesn't exist!");
             } else {
                 variableTypes.getFirst().put(variableAssignment.name.name, variableTypes.getFirst().get(varName));
             }
-        } else if (variableAssignment.expression instanceof Operation) {
-            ExpressionType type = checkOperation((Operation) variableAssignment.expression);
-            variableTypes.getFirst().put(variableAssignment.name.name, type);
         }
     }
 
@@ -158,22 +158,18 @@ public class Checker {
         variableTypes.removeFirst();
 
         if (ifClause.getElseClause() != null) {
-            checkElseClause(ifClause.getElseClause());
+            checkRuleBody((ifClause.getElseClause()).body);
         }
     }
 
-    private void checkElseClause(ElseClause elseClause) {
-        checkRuleBody(elseClause.body);
-    }
-
     private void checkRuleBody(ArrayList<ASTNode> body) {
-        for (ASTNode astNode : body) {
-            if (astNode instanceof Declaration) {
-                checkDeclaration((Declaration) astNode);
-            } else if (astNode instanceof IfClause) {
-                checkIfClause((IfClause) astNode);
-            } else if (astNode instanceof VariableAssignment) {
-                checkVariableAssignment((VariableAssignment) astNode);
+        for (ASTNode bodyPart : body) {
+            if (bodyPart instanceof Declaration) {
+                checkDeclaration((Declaration) bodyPart);
+            } else if (bodyPart instanceof IfClause) {
+                checkIfClause((IfClause) bodyPart);
+            } else if (bodyPart instanceof VariableAssignment) {
+                checkVariableAssignment((VariableAssignment) bodyPart);
             }
         }
     }
@@ -189,8 +185,8 @@ public class Checker {
     }
 
     private ExpressionType getVariableType(String variableType) {
-        for (HashMap<String, ExpressionType> scope : variableTypes) {
-            ExpressionType expressionType = scope.get(variableType);
+        for (HashMap<String, ExpressionType> currentScope : variableTypes) {
+            ExpressionType expressionType = currentScope.get(variableType);
             if (expressionType != null) {
                 return expressionType;
             }

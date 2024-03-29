@@ -13,50 +13,48 @@ public class Generator {
 
 	public String generate(AST ast) {
 		Stylesheet stylesheet = ast.root;
-		StringBuilder stringBuilder = new StringBuilder();
-		for(ASTNode node : stylesheet.getChildren()){
-			stringBuilder.append(getSelectorString((Stylerule) node));
-			stringBuilder.append(getDeclarationString(node));
-			stringBuilder.append("}\n\n");
+		StringBuilder stylesheetStringGenerator = new StringBuilder();
+
+		for(ASTNode child : stylesheet.getChildren()){
+			stylesheetStringGenerator.append(selectorToString((Stylerule) child));
+			stylesheetStringGenerator.append(declarationToString(child));
+			stylesheetStringGenerator.append("}\n\n");
 		}
-		return stringBuilder.toString();
+		return stylesheetStringGenerator.toString();
 	}
 
-	private String getSelectorString(Stylerule stylerule){
-		StringBuilder builder = new StringBuilder();
+	private String selectorToString(Stylerule stylerule){
+		StringBuilder selectorStringGenerator = new StringBuilder();
+
 		for(Selector selector : stylerule.selectors){
-			builder.append(selector.toString());
+			selectorStringGenerator.append(selector.toString());
 		}
-		builder.append(" {\n");
-		return builder.toString();
+		selectorStringGenerator.append(" {\n");
+		return selectorStringGenerator.toString();
 	}
 
-	private String getDeclarationString(ASTNode body) {
-		StringBuilder builder = new StringBuilder();
+	private String declarationToString(ASTNode declaration) {
+		StringBuilder declarationStringGenerator = new StringBuilder();
 		Map<String, Declaration> lastDeclarationMap = new HashMap<>();
 
-		for (ASTNode node : body.getChildren()) {
-			if (node instanceof Declaration) {
-				Declaration declaration = (Declaration) node;
-				lastDeclarationMap.put(declaration.property.name, declaration);
+		for (ASTNode child : declaration.getChildren()) {
+			if (child instanceof Declaration) {
+				Declaration declarationChild = (Declaration) child;
+				lastDeclarationMap.put(declarationChild.property.name, declarationChild);
 			}
 		}
-
-		for (Declaration declaration : lastDeclarationMap.values()) {
-			builder.append("  ")
-					.append(declaration.property.name)
+		for (Declaration declarationChild : lastDeclarationMap.values()) {
+			declarationStringGenerator.append("  ")
+					.append(declarationChild.property.name)
 					.append(": ")
-					.append(getExpressionValueString(declaration.expression))
+					.append(expressionValueToString(declarationChild.expression))
 					.append(";\n");
 		}
-
-		return builder.toString();
+		return declarationStringGenerator.toString();
 	}
 
-
-
-	private String getExpressionValueString(Expression expression){
-		if(expression instanceof ColorLiteral){
+	private String expressionValueToString(Expression expression){
+		if (expression instanceof ColorLiteral){
 			return ((ColorLiteral) expression).value;
 		} else if(expression instanceof PixelLiteral){
 			return ((PixelLiteral) expression).value + "px";
@@ -65,6 +63,4 @@ public class Generator {
 		}
 		return "";
 	}
-
-
 }

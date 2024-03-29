@@ -26,37 +26,56 @@ public class Evaluator implements Transform {
     @Override
     public void apply(AST ast) {
         applyStylesheet(ast.root);
-
     }
 
     private void applyStylesheet(Stylesheet stylesheet) {
         variableValues.addFirst(new HashMap<>());
+        List<ASTNode> resolvedNodes = new ArrayList<>();
 
-        List<ASTNode> nodesToRemove = new ArrayList<>();
         for (ASTNode child : stylesheet.getChildren()) {
             if (child instanceof VariableAssignment) {
                 applyVariableAssignment((VariableAssignment) child);
-                nodesToRemove.add(child);
+                resolvedNodes.add(child);
             } else if (child instanceof Stylerule) {
                 applyStylerule((Stylerule) child);
             }
         }
         variableValues.removeFirst();
-        nodesToRemove.forEach(stylesheet::removeChild);
+        resolvedNodes.forEach(stylesheet::removeChild);
+    }
+
+    private void applyStylerule(Stylerule stylerule) {
+        variableValues.addFirst(new HashMap<>());
+        ArrayList<ASTNode> nodesToCheck = new ArrayList<>();
+
+        for (ASTNode body : stylerule.body) {
+            applyStyleruleBody(body, nodesToCheck);
+        }
+        variableValues.removeFirst();
+        stylerule.body = nodesToCheck;
+    }
+
+    private void applyStyleruleBody(ASTNode body, ArrayList<ASTNode> parent) {
+        if (body instanceof VariableAssignment) {
+            applyVariableAssignment((VariableAssignment) body);
+        } else if (body instanceof Declaration) {
+            applyDeclaration((Declaration) body);
+            parent.add(body);
+        } else if (body instanceof IfClause) {
+            applyIfClause((IfClause) body, parent);
+        }
     }
 
     private void applyVariableAssignment(VariableAssignment variableAssignment) {
         variableAssignment.expression = applyExpression(variableAssignment.expression);
-
         variableValues.getFirst().put(variableAssignment.name.name, (Literal) variableAssignment.expression);
     }
-
 
     private Literal applyExpression(Expression expression) {
         if (expression instanceof Operation) {
             return applyOperation((Operation) expression);
         } else if (expression instanceof VariableReference) {
-            return getVariableLiteral(((VariableReference) expression).name, variableValues);
+            return getLiteral(((VariableReference) expression).name, variableValues);
         } else if (expression instanceof Literal) {
             return (Literal) expression;
         }
@@ -75,44 +94,9 @@ public class Evaluator implements Transform {
         } else if (operation instanceof SubtractOperation) {
             return createLiteral(left, leftValue - rightValue);
         } else if (operation instanceof MultiplyOperation) {
-            if (left instanceof ScalarLiteral) {
-                return createLiteral(right, leftValue * rightValue);
-            } else {
-                return createLiteral(left, leftValue * rightValue);
-            }
+            return createLiteral(left instanceof ScalarLiteral ? right : left, leftValue * rightValue);
         }
         return null;
-    }
-
-    private Literal getVariableLiteral(String variableReference, LinkedList<HashMap<String, Literal>> variableValues) {
-        for (HashMap<String, Literal> variableValue : variableValues) {
-            Literal variable = variableValue.get(variableReference);
-            if (variable != null) {
-                return variable;
-            }
-        }
-        return null;
-    }
-
-    private void applyStylerule(Stylerule rule) {
-        variableValues.addFirst(new HashMap<>());
-        ArrayList<ASTNode> nodesToAdd = new ArrayList<>();
-        for (ASTNode body : rule.body) {
-            applyStyleruleBody(body, nodesToAdd);
-        }
-        variableValues.removeFirst();
-        rule.body = nodesToAdd;
-    }
-
-    private void applyStyleruleBody(ASTNode body, ArrayList<ASTNode> parent) {
-        if (body instanceof Declaration) {
-            applyDeclaration((Declaration) body);
-            parent.add(body);
-        } else if (body instanceof VariableAssignment) {
-            applyVariableAssignment((VariableAssignment) body);
-        } else if (body instanceof  IfClause) {
-            applyIfClause((IfClause) body, parent);
-        }
     }
 
     private void applyIfClause(IfClause ifClause, ArrayList<ASTNode> parent) {
@@ -123,13 +107,9 @@ public class Evaluator implements Transform {
                 ifClause.elseClause.body = new ArrayList<>();
             }
         } else {
-            if (ifClause.elseClause == null) {
-                ifClause.body = new ArrayList<>();
-            } else {
-                ifClause.body = ifClause.elseClause.body;
-                ifClause.elseClause.body = new ArrayList<>();
-            }
+            ifClause.body = ifClause.elseClause == null ? new ArrayList<>() : ifClause.elseClause.body;
         }
+
         for (ASTNode child : ifClause.getChildren()) {
             applyStyleruleBody(child, parent);
         }
@@ -137,6 +117,16 @@ public class Evaluator implements Transform {
 
     private void applyDeclaration(Declaration declaration) {
         declaration.expression = applyExpression(declaration.expression);
+    }
+
+    private Literal getLiteral(String variableReference, LinkedList<HashMap<String, Literal>> variableValues) {
+        for (HashMap<String, Literal> variableValue : variableValues) {
+            Literal variable = variableValue.get(variableReference);
+            if (variable != null) {
+                return variable;
+            }
+        }
+        return null;
     }
 
     private int getLiteralValue(Literal literal) {
